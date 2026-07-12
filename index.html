@@ -226,11 +226,10 @@
   // ================================================================
   //  SUPABASE CONFIGURATION  (REPLACE WITH YOUR OWN)
   // ================================================================
-  const SUPABASE_URL = 'https://ftwblniakzjtfpsmyklx.supabase.co';
-  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ0d2Jsbmlha3pqdGZwc215a2x4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM4MTcwNTIsImV4cCI6MjA5OTM5MzA1Mn0.muScYbd321599Ei4YidwFvZ4z0frBcH9G_ePn814RFU';
+const SUPABASE_URL = 'https://ftwblniakzjtfpsmyklx.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ0d2Jsbmlha3pqdGZwc215a2x4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM4MTcwNTIsImV4cCI6MjA5OTM5MzA1Mn0.muScYbd321599Ei4YidwFvZ4z0frBcH9G_ePn814RFU';
 
-  // --- FIX: rename to supabaseClient to avoid duplicate declaration ---
-  const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
   // ================================================================
   //  HELPERS
@@ -293,12 +292,12 @@
   let currentSession = null;
 
   async function initAuth() {
-    const { data: { session } } = await supabaseClient.auth.getSession();
+    const { data: { session } } = await supabase.auth.getSession();
     currentSession = session;
     if (session) {
       currentUser = session.user;
       // Fetch profile role
-      const { data: profile } = await supabaseClient
+      const { data: profile } = await supabase
         .from('profiles')
         .select('role')
         .eq('id', session.user.id)
@@ -309,7 +308,7 @@
   }
 
   async function loginUser(email, password) {
-    const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
       toast(error.message, 'error');
       return false;
@@ -317,7 +316,7 @@
     currentUser = data.user;
     currentSession = data.session;
     // Fetch role
-    const { data: profile } = await supabaseClient
+    const { data: profile } = await supabase
       .from('profiles')
       .select('role')
       .eq('id', data.user.id)
@@ -330,7 +329,7 @@
   }
 
   async function registerUser(email, password, username) {
-    const { data, error } = await supabaseClient.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: { data: { username } }
@@ -347,7 +346,7 @@
   }
 
   async function logoutUser() {
-    await supabaseClient.auth.signOut();
+    await supabase.auth.signOut();
     currentUser = null;
     currentSession = null;
     toast('Logged out.', 'info');
@@ -364,7 +363,7 @@
 
   // Posts
   async function getPosts() {
-    const { data, error } = await supabaseClient
+    const { data, error } = await supabase
       .from('posts')
       .select('*')
       .order('created_at', { ascending: false });
@@ -373,7 +372,7 @@
   }
 
   async function getPostById(id) {
-    const { data, error } = await supabaseClient
+    const { data, error } = await supabase
       .from('posts')
       .select('*, comments(*, profiles(username))') // nested comments
       .eq('id', id)
@@ -384,7 +383,7 @@
 
   async function createPost(title, category, excerpt, content) {
     if (!isAdmin()) { toast('Only admin can create posts.', 'error'); return false; }
-    const { data, error } = await supabaseClient
+    const { data, error } = await supabase
       .from('posts')
       .insert([{
         title,
@@ -402,7 +401,7 @@
 
   async function updatePost(id, { title, category, excerpt, content }) {
     if (!isAdmin()) { toast('Only admin can update posts.', 'error'); return false; }
-    const { error } = await supabaseClient
+    const { error } = await supabase
       .from('posts')
       .update({ title, category, excerpt: excerpt || truncate(content, 130), content, updated_at: new Date() })
       .eq('id', id);
@@ -413,7 +412,7 @@
 
   async function deletePost(id) {
     if (!isAdmin()) { toast('Only admin can delete posts.', 'error'); return false; }
-    const { error } = await supabaseClient
+    const { error } = await supabase
       .from('posts')
       .delete()
       .eq('id', id);
@@ -425,7 +424,7 @@
   // Comments
   async function addComment(postId, text) {
     if (!isLoggedIn()) { toast('Please log in to comment.', 'error'); return false; }
-    const { error } = await supabaseClient
+    const { error } = await supabase
       .from('comments')
       .insert([{
         post_id: postId,
@@ -440,7 +439,7 @@
 
   // Community
   async function getCommunityPosts() {
-    const { data, error } = await supabaseClient
+    const { data, error } = await supabase
       .from('community_posts')
       .select('*')
       .order('created_at', { ascending: false });
@@ -450,7 +449,7 @@
 
   async function addCommunityPost(content, tag) {
     if (!isLoggedIn()) { toast('Please log in to share.', 'error'); return false; }
-    const { error } = await supabaseClient
+    const { error } = await supabase
       .from('community_posts')
       .insert([{
         author_id: currentUser.id,
@@ -465,7 +464,7 @@
 
   // Users (for admin)
   async function getUsers() {
-    const { data, error } = await supabaseClient
+    const { data, error } = await supabase
       .from('profiles')
       .select('*');
     if (error) { console.error(error); return []; }
@@ -474,7 +473,10 @@
 
   async function deleteUser(userId) {
     if (!isAdmin()) { toast('Admin access required.', 'error'); return false; }
-    const { error } = await supabaseClient
+    // Delete from auth (requires admin privileges) – Supabase allows via REST if using service role key, but we'll keep it simple: delete from profiles only.
+    // For a full solution, you'd call a Supabase Edge Function with service role.
+    // We'll just remove from profiles (cascade delete is on).
+    const { error } = await supabase
       .from('profiles')
       .delete()
       .eq('id', userId);
@@ -506,6 +508,7 @@
   }
 
   function renderNav() {
+    // same as before
     const links = document.querySelectorAll('[data-nav]');
     links.forEach(el => {
       const nav = el.getAttribute('data-nav');
@@ -619,6 +622,7 @@
       return `<div class="container"><div class="empty-state"><i class="fas fa-search"></i><h4>Post not found</h4></div></div>`;
     }
     const isAdminUser = isAdmin();
+    // Comments are nested; we need to map them (comments is an array)
     const comments = post.comments || [];
     return `
       <div class="container" style="padding-top:30px;">
