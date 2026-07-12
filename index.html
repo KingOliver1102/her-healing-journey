@@ -229,7 +229,7 @@
 const SUPABASE_URL = 'https://ftwblniakzjtfpsmyklx.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ0d2Jsbmlha3pqdGZwc215a2x4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM4MTcwNTIsImV4cCI6MjA5OTM5MzA1Mn0.muScYbd321599Ei4YidwFvZ4z0frBcH9G_ePn814RFU';
 
-  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
   // ================================================================
   //  HELPERS
@@ -292,12 +292,12 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
   let currentSession = null;
 
   async function initAuth() {
-    const { data: { session } } = await supabase.auth.getSession();
+    const { data: { session } } = await supabaseClient.auth.getSession();
     currentSession = session;
     if (session) {
       currentUser = session.user;
       // Fetch profile role
-      const { data: profile } = await supabase
+      const { data: profile } = await supabaseClient
         .from('profiles')
         .select('role')
         .eq('id', session.user.id)
@@ -308,7 +308,7 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
   }
 
   async function loginUser(email, password) {
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
     if (error) {
       toast(error.message, 'error');
       return false;
@@ -316,7 +316,7 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
     currentUser = data.user;
     currentSession = data.session;
     // Fetch role
-    const { data: profile } = await supabase
+    const { data: profile } = await supabaseClient
       .from('profiles')
       .select('role')
       .eq('id', data.user.id)
@@ -329,7 +329,7 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
   }
 
   async function registerUser(email, password, username) {
-    const { data, error } = await supabase.auth.signUp({
+    const { data, error } = await supabaseClient.auth.signUp({
       email,
       password,
       options: { data: { username } }
@@ -346,7 +346,7 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
   }
 
   async function logoutUser() {
-    await supabase.auth.signOut();
+    await supabaseClient.auth.signOut();
     currentUser = null;
     currentSession = null;
     toast('Logged out.', 'info');
@@ -363,7 +363,7 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 
   // Posts
   async function getPosts() {
-    const { data, error } = await supabase
+    const { data, error } = await supabaseClient
       .from('posts')
       .select('*')
       .order('created_at', { ascending: false });
@@ -372,7 +372,7 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
   }
 
   async function getPostById(id) {
-    const { data, error } = await supabase
+    const { data, error } = await supabaseClient
       .from('posts')
       .select('*, comments(*, profiles(username))') // nested comments
       .eq('id', id)
@@ -383,7 +383,7 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 
   async function createPost(title, category, excerpt, content) {
     if (!isAdmin()) { toast('Only admin can create posts.', 'error'); return false; }
-    const { data, error } = await supabase
+    const { data, error } = await supabaseClient
       .from('posts')
       .insert([{
         title,
@@ -401,7 +401,7 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 
   async function updatePost(id, { title, category, excerpt, content }) {
     if (!isAdmin()) { toast('Only admin can update posts.', 'error'); return false; }
-    const { error } = await supabase
+    const { error } = await supabaseClient
       .from('posts')
       .update({ title, category, excerpt: excerpt || truncate(content, 130), content, updated_at: new Date() })
       .eq('id', id);
@@ -412,7 +412,7 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 
   async function deletePost(id) {
     if (!isAdmin()) { toast('Only admin can delete posts.', 'error'); return false; }
-    const { error } = await supabase
+    const { error } = await supabaseClient
       .from('posts')
       .delete()
       .eq('id', id);
@@ -424,7 +424,7 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
   // Comments
   async function addComment(postId, text) {
     if (!isLoggedIn()) { toast('Please log in to comment.', 'error'); return false; }
-    const { error } = await supabase
+    const { error } = await supabaseClient
       .from('comments')
       .insert([{
         post_id: postId,
@@ -439,7 +439,7 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 
   // Community
   async function getCommunityPosts() {
-    const { data, error } = await supabase
+    const { data, error } = await supabaseClient
       .from('community_posts')
       .select('*')
       .order('created_at', { ascending: false });
@@ -449,7 +449,7 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 
   async function addCommunityPost(content, tag) {
     if (!isLoggedIn()) { toast('Please log in to share.', 'error'); return false; }
-    const { error } = await supabase
+    const { error } = await supabaseClient
       .from('community_posts')
       .insert([{
         author_id: currentUser.id,
@@ -464,7 +464,7 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 
   // Users (for admin)
   async function getUsers() {
-    const { data, error } = await supabase
+    const { data, error } = await supabaseClient
       .from('profiles')
       .select('*');
     if (error) { console.error(error); return []; }
@@ -476,7 +476,7 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
     // Delete from auth (requires admin privileges) – Supabase allows via REST if using service role key, but we'll keep it simple: delete from profiles only.
     // For a full solution, you'd call a Supabase Edge Function with service role.
     // We'll just remove from profiles (cascade delete is on).
-    const { error } = await supabase
+    const { error } = await supabaseClient
       .from('profiles')
       .delete()
       .eq('id', userId);
