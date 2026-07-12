@@ -55,9 +55,6 @@
     .section-subtitle { color: var(--text-light); font-size: 1.05rem; margin-bottom: 32px; }
     .text-center { text-align: center; }
     .hidden { display: none !important; }
-    /* ... (all other styles remain identical to the original) ... */
-    /* We'll include the full CSS from the previous version to keep the design intact */
-    /* For brevity, I'll include a condensed version; but in your actual file, copy the entire <style> from the original */
     /* ===== HEADER / NAV ===== */
     header { background: var(--warm-white); box-shadow: 0 2px 20px rgba(0,0,0,0.04); position: sticky; top: 0; z-index: 1000; padding: 14px 0; border-bottom: 1px solid rgba(184,124,94,0.12); }
     .header-inner { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
@@ -226,10 +223,10 @@
   // ================================================================
   //  SUPABASE CONFIGURATION  (REPLACE WITH YOUR OWN)
   // ================================================================
-const SUPABASE_URL = 'https://ftwblniakzjtfpsmyklx.supabase.co';
+const SUPABASE_URL = 'https://ftwblniakzjtfpsmyklx.supabaseClient.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ0d2Jsbmlha3pqdGZwc215a2x4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM4MTcwNTIsImV4cCI6MjA5OTM5MzA1Mn0.muScYbd321599Ei4YidwFvZ4z0frBcH9G_ePn814RFU';
 
-  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
   // ================================================================
   //  HELPERS
@@ -292,7 +289,7 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
   let currentSession = null;
 
   async function initAuth() {
-    const { data: { session } } = await supabase.auth.getSession();
+    const { data: { session } } = await supabaseClient.auth.getSession();
     currentSession = session;
     if (session) {
       currentUser = session.user;
@@ -308,7 +305,7 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
   }
 
   async function loginUser(email, password) {
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
     if (error) {
       toast(error.message, 'error');
       return false;
@@ -329,7 +326,7 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
   }
 
   async function registerUser(email, password, username) {
-    const { data, error } = await supabase.auth.signUp({
+    const { data, error } = await supabaseClient.auth.signUp({
       email,
       password,
       options: { data: { username } }
@@ -346,7 +343,7 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
   }
 
   async function logoutUser() {
-    await supabase.auth.signOut();
+    await supabaseClient.auth.signOut();
     currentUser = null;
     currentSession = null;
     toast('Logged out.', 'info');
@@ -508,7 +505,6 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
   }
 
   function renderNav() {
-    // same as before
     const links = document.querySelectorAll('[data-nav]');
     links.forEach(el => {
       const nav = el.getAttribute('data-nav');
@@ -622,7 +618,6 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
       return `<div class="container"><div class="empty-state"><i class="fas fa-search"></i><h4>Post not found</h4></div></div>`;
     }
     const isAdminUser = isAdmin();
-    // Comments are nested; we need to map them (comments is an array)
     const comments = post.comments || [];
     return `
       <div class="container" style="padding-top:30px;">
@@ -831,7 +826,6 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
   //  EVENT BINDING (with async handlers)
   // ================================================================
   function bindEvents() {
-    // Navigation
     document.querySelectorAll('[data-nav]').forEach(el => {
       el.onclick = (e) => {
         e.preventDefault();
@@ -842,7 +836,6 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
       };
     });
 
-    // Category filter
     document.querySelectorAll('[data-cat]').forEach(el => {
       el.onclick = () => { const cat = el.getAttribute('data-cat'); navigate('blog', cat); };
     });
@@ -850,12 +843,10 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
       el.onclick = () => { const cat = el.getAttribute('data-nav-cat'); navigate('blog', cat === 'all' ? 'all' : cat); };
     });
 
-    // View post
     document.querySelectorAll('[data-view-post]').forEach(el => {
       el.onclick = () => { const id = el.getAttribute('data-view-post'); navigate('post', id); };
     });
 
-    // Edit post (admin)
     document.querySelectorAll('[data-edit-post]').forEach(el => {
       el.onclick = () => {
         if (!isAdmin()) { toast('Admin access required.', 'error'); return; }
@@ -865,7 +856,6 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
       };
     });
 
-    // Delete post
     document.querySelectorAll('[data-delete-post]').forEach(el => {
       el.onclick = async () => {
         if (!isAdmin()) { toast('Admin access required.', 'error'); return; }
@@ -878,7 +868,6 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
       };
     });
 
-    // Delete user (admin)
     document.querySelectorAll('[data-delete-user]').forEach(el => {
       el.onclick = async () => {
         if (!isAdmin()) { toast('Admin access required.', 'error'); return; }
@@ -890,7 +879,6 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
       };
     });
 
-    // Submit comment
     const commentBtn = document.getElementById('submitCommentBtn');
     if (commentBtn) {
       commentBtn.onclick = async () => {
@@ -905,7 +893,6 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
       };
     }
 
-    // Submit community post
     const communityBtn = document.getElementById('submitCommunityBtn');
     if (communityBtn) {
       communityBtn.onclick = async () => {
@@ -920,7 +907,6 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
       };
     }
 
-    // Admin: New Post
     const newBtn = document.getElementById('adminNewPostBtn');
     if (newBtn) {
       newBtn.onclick = () => {
@@ -939,7 +925,6 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
       };
     }
 
-    // Admin: Cancel Edit
     const cancelEditBtn = document.getElementById('adminCancelEditBtn');
     if (cancelEditBtn) {
       cancelEditBtn.onclick = () => {
@@ -950,7 +935,6 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
       };
     }
 
-    // Admin: Post Form Submit
     const submitBtn = document.getElementById('postFormSubmitBtn');
     if (submitBtn) {
       submitBtn.onclick = async () => {
@@ -976,7 +960,6 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
       };
     }
 
-    // Admin: Post Form Cancel
     const cancelBtn = document.getElementById('postFormCancelBtn');
     if (cancelBtn) {
       cancelBtn.onclick = () => {
@@ -988,7 +971,6 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
       };
     }
 
-    // Auth Form
     const authForm = document.getElementById('authForm');
     if (authForm) {
       authForm.onsubmit = async (e) => {
@@ -1007,12 +989,10 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
       };
     }
 
-    // Header auth buttons
     document.getElementById('loginBtn').onclick = () => { if (!isLoggedIn()) navigate('login'); };
     document.getElementById('registerBtn').onclick = () => { if (!isLoggedIn()) navigate('register'); };
     document.getElementById('logoutBtn').onclick = logoutUser;
 
-    // Enter key for comment and community inputs
     const commentInput = document.getElementById('commentInput');
     if (commentInput) {
       commentInput.addEventListener('keydown', (e) => {
