@@ -549,7 +549,7 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
       registerBtn.classList.add('hidden');
       logoutBtn.classList.remove('hidden');
       greeting.classList.remove('hidden');
-      greeting.textContent = '👋 ' + (user.email.split('@')[0]);
+      greeting.textContent = '👋 ' + (user.username.split('@')[0]);
     } else {
       loginBtn.classList.remove('hidden');
       registerBtn.classList.remove('hidden');
