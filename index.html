@@ -240,10 +240,10 @@
 
 <script>
   // ================================================================
-  //  SUPABASE CONFIGURATION
+  //  SUPABASE CONFIGURATION  (REPLACE WITH YOUR OWN)
   // ================================================================
-  const SUPABASE_URL = 'https://ftwblniakzjtfpsmyklx.supabase.co';
-  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ0d2Jsbmlha3pqdGZwc215a2x4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM4MTcwNTIsImV4cCI6MjA5OTM5MzA1Mn0.muScYbd321599Ei4YidwFvZ4z0frBcH9G_ePn814RFU';
+const SUPABASE_URL = 'https://ftwblniakzjtfpsmyklx.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ0d2Jsbmlha3pqdGZwc215a2x4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM4MTcwNTIsImV4cCI6MjA5OTM5MzA1Mn0.muScYbd321599Ei4YidwFvZ4z0frBcH9G_ePn814RFU';
 
   const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -312,16 +312,13 @@
     currentSession = session;
     if (session) {
       currentUser = session.user;
-      // Fetch profile including username
+      // Fetch profile role
       const { data: profile } = await supabaseClient
         .from('profiles')
-        .select('role, username')
+        .select('role')
         .eq('id', session.user.id)
         .single();
-      if (profile) {
-        currentUser.role = profile.role;
-        currentUser.username = profile.username; // Store username
-      }
+      if (profile) currentUser.role = profile.role;
     }
     renderNav();
   }
@@ -334,16 +331,13 @@
     }
     currentUser = data.user;
     currentSession = data.session;
-    // Fetch profile including username
+    // Fetch role
     const { data: profile } = await supabaseClient
       .from('profiles')
-      .select('role, username')
+      .select('role')
       .eq('id', data.user.id)
       .single();
-    if (profile) {
-      currentUser.role = profile.role;
-      currentUser.username = profile.username;
-    }
+    if (profile) currentUser.role = profile.role;
     toast('Welcome back!', 'success');
     renderNav();
     navigate('home');
@@ -368,13 +362,6 @@
   }
 
   async function logoutUser() {
-    // Unsubscribe from realtime channels
-    if (window._realtimeChannels) {
-      window._realtimeChannels.forEach(channel => {
-        supabaseClient.removeChannel(channel);
-      });
-      window._realtimeChannels = [];
-    }
     await supabaseClient.auth.signOut();
     currentUser = null;
     currentSession = null;
@@ -420,17 +407,11 @@
         excerpt: excerpt || truncate(content, 130),
         content,
         author_id: currentUser.id,
-        author_name: currentUser.username || currentUser.email.split('@')[0]
+        author_name: currentUser.email.split('@')[0] // fallback
       }])
       .select();
     if (error) { toast(error.message, 'error'); return false; }
     toast('Post published!', 'success');
-    // Refresh the current page
-    if (currentPage === 'admin') {
-      renderPage();
-    } else {
-      navigate('home');
-    }
     return true;
   }
 
@@ -442,10 +423,6 @@
       .eq('id', id);
     if (error) { toast(error.message, 'error'); return false; }
     toast('Post updated!', 'success');
-    // Refresh the admin page
-    if (currentPage === 'admin') {
-      renderPage();
-    }
     return true;
   }
 
@@ -457,11 +434,6 @@
       .eq('id', id);
     if (error) { toast(error.message, 'error'); return false; }
     toast('Post deleted.', 'info');
-    if (currentPage === 'post' && currentPostId === id) {
-      navigate('blog');
-    } else if (currentPage === 'admin') {
-      renderPage();
-    }
     return true;
   }
 
@@ -473,15 +445,11 @@
       .insert([{
         post_id: postId,
         author_id: currentUser.id,
-        author_name: currentUser.username || currentUser.email.split('@')[0],
+        author_name: currentUser.email.split('@')[0],
         text
       }]);
     if (error) { toast(error.message, 'error'); return false; }
     toast('Comment added!', 'success');
-    // Refresh the post detail page
-    if (currentPage === 'post' && currentPostId === postId) {
-      renderPage();
-    }
     return true;
   }
 
@@ -501,16 +469,12 @@
       .from('community_posts')
       .insert([{
         author_id: currentUser.id,
-        author_name: currentUser.username || currentUser.email.split('@')[0],
+        author_name: currentUser.email.split('@')[0],
         content,
         tag: tag || 'reflection'
       }]);
     if (error) { toast(error.message, 'error'); return false; }
     toast('Thank you for sharing!', 'success');
-    // Refresh the community page
-    if (currentPage === 'community') {
-      renderPage();
-    }
     return true;
   }
 
@@ -525,111 +489,20 @@
 
   async function deleteUser(userId) {
     if (!isAdmin()) { toast('Admin access required.', 'error'); return false; }
-    if (!confirm('Disable this user account? They will no longer be able to log in.')) return false;
-    
-    // Instead of deleting, disable the user by setting role to 'disabled'
+    // Delete from auth (requires admin privileges) – Supabase allows via REST if using service role key, but we'll keep it simple: delete from profiles only.
+    // For a full solution, you'd call a Supabase Edge Function with service role.
+    // We'll just remove from profiles (cascade delete is on).
     const { error } = await supabaseClient
       .from('profiles')
-      .update({ role: 'disabled' })
+      .delete()
       .eq('id', userId);
-    
-    if (error) {
-      toast('Error disabling user: ' + error.message, 'error');
-      return false;
-    }
-    
-    toast('User account disabled successfully!', 'success');
-    // Refresh the admin page
-    if (currentPage === 'admin') {
-      renderPage();
-    }
+    if (error) { toast(error.message, 'error'); return false; }
+    toast('User removed.', 'info');
     return true;
   }
 
   // ================================================================
-  //  REALTIME NOTIFICATIONS WITH AUTO-REFRESH
-  // ================================================================
-
-  function setupRealtimeNotifications() {
-    // Only listen if user is logged in
-    if (!isLoggedIn()) return;
-
-    // Subscribe to new posts
-    const postsChannel = supabaseClient
-      .channel('posts-channel')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'posts'
-        },
-        (payload) => {
-          const newPost = payload.new;
-          // Don't notify if the current user created the post
-          if (currentUser && newPost.author_id === currentUser.id) return;
-          
-          toast(`📝 New blog post: "${newPost.title}"`, 'info');
-          
-          // Auto-refresh if on home or blog page
-          if (currentPage === 'home' || currentPage === 'blog') {
-            renderPage();
-          }
-          // If on admin, refresh to update the list
-          if (currentPage === 'admin') {
-            renderPage();
-          }
-        }
-      )
-      .subscribe();
-
-    // Subscribe to new comments
-    const commentsChannel = supabaseClient
-      .channel('comments-channel')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'comments'
-        },
-        (payload) => {
-          const newComment = payload.new;
-          // Don't notify if the current user posted the comment
-          if (currentUser && newComment.author_id === currentUser.id) return;
-          
-          // Fetch the related post title to show in notification
-          supabaseClient
-            .from('posts')
-            .select('title')
-            .eq('id', newComment.post_id)
-            .single()
-            .then(({ data, error }) => {
-              if (error) {
-                toast(`💬 New comment from ${newComment.author_name}`, 'info');
-              } else {
-                toast(`💬 New comment on "${data.title}" by ${newComment.author_name}`, 'info');
-              }
-            });
-          
-          // Auto-refresh if viewing the post that got a comment
-          if (currentPage === 'post' && currentPostId === newComment.post_id) {
-            renderPage();
-          }
-          // If on admin, refresh to update the list
-          if (currentPage === 'admin') {
-            renderPage();
-          }
-        }
-      )
-      .subscribe();
-
-    // Store channels so we can unsubscribe later
-    window._realtimeChannels = [postsChannel, commentsChannel];
-  }
-
-  // ================================================================
-  //  NAVIGATION & RENDERING
+  //  NAVIGATION & RENDERING (similar to original, but with async data)
   // ================================================================
   let currentPage = 'home';
   let currentPostId = null;
@@ -651,6 +524,7 @@
   }
 
   function renderNav() {
+    // same as before
     const links = document.querySelectorAll('[data-nav]');
     links.forEach(el => {
       const nav = el.getAttribute('data-nav');
@@ -675,9 +549,7 @@
       registerBtn.classList.add('hidden');
       logoutBtn.classList.remove('hidden');
       greeting.classList.remove('hidden');
-      // Use username if available, otherwise fallback to email
-      const displayName = user.username || user.email.split('@')[0];
-      greeting.textContent = '👋 ' + displayName;
+      greeting.textContent = '👋 ' + (user.email.split('@')[0]);
     } else {
       loginBtn.classList.remove('hidden');
       registerBtn.classList.remove('hidden');
@@ -701,9 +573,7 @@
     bindEvents();
   }
 
-  // ---------- RENDER FUNCTIONS ----------
-  // (All render functions remain unchanged – they're the same as before)
-
+  // ---------- RENDER FUNCTIONS (async) ----------
   async function renderHome() {
     const posts = await getPosts();
     const featured = posts.slice(0, 3);
@@ -768,6 +638,7 @@
       return `<div class="container"><div class="empty-state"><i class="fas fa-search"></i><h4>Post not found</h4></div></div>`;
     }
     const isAdminUser = isAdmin();
+    // Comments are nested; we need to map them (comments is an array)
     const comments = post.comments || [];
     return `
       <div class="container" style="padding-top:30px;">
@@ -973,7 +844,7 @@
   }
 
   // ================================================================
-  //  EVENT BINDING
+  //  EVENT BINDING (with async handlers)
   // ================================================================
   function bindEvents() {
     // Navigation
@@ -1017,6 +888,8 @@
         const id = el.getAttribute('data-delete-post');
         if (confirm('Delete this post permanently?')) {
           await deletePost(id);
+          if (currentPage === 'post' && currentPostId === id) navigate('blog');
+          else renderPage();
         }
       };
     });
@@ -1026,7 +899,10 @@
       el.onclick = async () => {
         if (!isAdmin()) { toast('Admin access required.', 'error'); return; }
         const id = el.getAttribute('data-delete-user');
-        await deleteUser(id);
+        if (confirm('Remove this user?')) {
+          await deleteUser(id);
+          renderPage();
+        }
       };
     });
 
@@ -1040,6 +916,7 @@
         const success = await addComment(postId, input.value.trim());
         if (success) {
           input.value = '';
+          navigate('post', postId);
         }
       };
     }
@@ -1054,6 +931,7 @@
         const success = await addCommunityPost(input.value.trim(), tag ? tag.value : 'reflection');
         if (success) {
           input.value = '';
+          navigate('community');
         }
       };
     }
@@ -1109,6 +987,7 @@
           if (form) form.style.display = 'none';
           const cancelEditBtn = document.getElementById('adminCancelEditBtn');
           if (cancelEditBtn) cancelEditBtn.style.display = 'none';
+          navigate('admin');
         }
       };
     }
@@ -1177,7 +1056,6 @@
   // ================================================================
   async function init() {
     await initAuth();
-    setupRealtimeNotifications(); // Start listening for new posts/comments
     await navigate('home');
   }
 
