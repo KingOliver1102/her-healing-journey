@@ -9,7 +9,7 @@
   <!-- Supabase JS -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
-    /* ===== CSS VARIABLES / THEME (same as before) ===== */
+    /* ===== CSS VARIABLES / THEME ===== */
     :root {
       --primary: #b87c5e;
       --primary-dark: #9a664b;
@@ -30,7 +30,7 @@
       --font-serif: 'Georgia', 'Times New Roman', serif;
       --font-sans: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
     }
-    /* ===== RESET & BASE (same as before) ===== */
+    /* ===== RESET & BASE ===== */
     * { margin: 0; padding: 0; box-sizing: border-box; }
     /* --- STICKY FOOTER FIX --- */
     html, body {
@@ -240,10 +240,10 @@
 
 <script>
   // ================================================================
-  //  SUPABASE CONFIGURATION  (REPLACE WITH YOUR OWN)
+  //  SUPABASE CONFIGURATION
   // ================================================================
-const SUPABASE_URL = 'https://ftwblniakzjtfpsmyklx.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ0d2Jsbmlha3pqdGZwc215a2x4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM4MTcwNTIsImV4cCI6MjA5OTM5MzA1Mn0.muScYbd321599Ei4YidwFvZ4z0frBcH9G_ePn814RFU';
+  const SUPABASE_URL = 'https://ftwblniakzjtfpsmyklx.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ0d2Jsbmlha3pqdGZwc215a2x4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM4MTcwNTIsImV4cCI6MjA5OTM5MzA1Mn0.muScYbd321599Ei4YidwFvZ4z0frBcH9G_ePn814RFU';
 
   const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -282,10 +282,6 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
     return formatDate(iso);
   }
 
-  function slugify(text) {
-    return text.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-  }
-
   function getCategoryLabel(cat) {
     const map = { 'self-love': 'Self-Love', 'self-growth': 'Self-Growth', 'spirituality': 'Spirituality', 'journaling': 'Journaling' };
     return map[cat] || cat;
@@ -312,13 +308,16 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
     currentSession = session;
     if (session) {
       currentUser = session.user;
-      // Fetch profile role
+      // Fetch profile including username
       const { data: profile } = await supabaseClient
         .from('profiles')
-        .select('role')
+        .select('role, username')
         .eq('id', session.user.id)
         .single();
-      if (profile) currentUser.role = profile.role;
+      if (profile) {
+        currentUser.role = profile.role;
+        currentUser.username = profile.username;
+      }
     }
     renderNav();
   }
@@ -331,13 +330,16 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
     }
     currentUser = data.user;
     currentSession = data.session;
-    // Fetch role
+    // Fetch profile including username
     const { data: profile } = await supabaseClient
       .from('profiles')
-      .select('role')
+      .select('role, username')
       .eq('id', data.user.id)
       .single();
-    if (profile) currentUser.role = profile.role;
+    if (profile) {
+      currentUser.role = profile.role;
+      currentUser.username = profile.username;
+    }
     toast('Welcome back!', 'success');
     renderNav();
     navigate('home');
@@ -354,14 +356,19 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
       toast(error.message, 'error');
       return false;
     }
-    // The trigger will create the profile
     toast('Account created! Please sign in.', 'success');
-    // Auto-login after signup? We'll let user sign in.
     navigate('login');
     return true;
   }
 
   async function logoutUser() {
+    // Unsubscribe from realtime channels
+    if (window._realtimeChannels) {
+      window._realtimeChannels.forEach(channel => {
+        supabaseClient.removeChannel(channel);
+      });
+      window._realtimeChannels = [];
+    }
     await supabaseClient.auth.signOut();
     currentUser = null;
     currentSession = null;
@@ -390,7 +397,7 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
   async function getPostById(id) {
     const { data, error } = await supabaseClient
       .from('posts')
-      .select('*, comments(*, profiles(username))') // nested comments
+      .select('*, comments(*, profiles(username))')
       .eq('id', id)
       .single();
     if (error) { console.error(error); return null; }
@@ -407,11 +414,16 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
         excerpt: excerpt || truncate(content, 130),
         content,
         author_id: currentUser.id,
-        author_name: currentUser.email.split('@')[0] // fallback
+        author_name: currentUser.username || currentUser.email.split('@')[0]
       }])
       .select();
     if (error) { toast(error.message, 'error'); return false; }
     toast('Post published!', 'success');
+    if (currentPage === 'admin') {
+      renderPage();
+    } else {
+      navigate('home');
+    }
     return true;
   }
 
@@ -423,6 +435,9 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
       .eq('id', id);
     if (error) { toast(error.message, 'error'); return false; }
     toast('Post updated!', 'success');
+    if (currentPage === 'admin') {
+      renderPage();
+    }
     return true;
   }
 
@@ -434,6 +449,11 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
       .eq('id', id);
     if (error) { toast(error.message, 'error'); return false; }
     toast('Post deleted.', 'info');
+    if (currentPage === 'post' && currentPostId === id) {
+      navigate('blog');
+    } else if (currentPage === 'admin') {
+      renderPage();
+    }
     return true;
   }
 
@@ -445,11 +465,14 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
       .insert([{
         post_id: postId,
         author_id: currentUser.id,
-        author_name: currentUser.email.split('@')[0],
+        author_name: currentUser.username || currentUser.email.split('@')[0],
         text
       }]);
     if (error) { toast(error.message, 'error'); return false; }
     toast('Comment added!', 'success');
+    if (currentPage === 'post' && currentPostId === postId) {
+      renderPage();
+    }
     return true;
   }
 
@@ -469,12 +492,15 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
       .from('community_posts')
       .insert([{
         author_id: currentUser.id,
-        author_name: currentUser.email.split('@')[0],
+        author_name: currentUser.username || currentUser.email.split('@')[0],
         content,
         tag: tag || 'reflection'
       }]);
     if (error) { toast(error.message, 'error'); return false; }
     toast('Thank you for sharing!', 'success');
+    if (currentPage === 'community') {
+      renderPage();
+    }
     return true;
   }
 
@@ -489,26 +515,96 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 
   async function deleteUser(userId) {
     if (!isAdmin()) { toast('Admin access required.', 'error'); return false; }
-    // Delete from auth (requires admin privileges) – Supabase allows via REST if using service role key, but we'll keep it simple: delete from profiles only.
-    // For a full solution, you'd call a Supabase Edge Function with service role.
-    // We'll just remove from profiles (cascade delete is on).
+    if (!confirm('Disable this user account? They will no longer be able to log in.')) return false;
+    
     const { error } = await supabaseClient
       .from('profiles')
-      .delete()
+      .update({ role: 'disabled' })
       .eq('id', userId);
-    if (error) { toast(error.message, 'error'); return false; }
-    toast('User removed.', 'info');
+    
+    if (error) {
+      toast('Error disabling user: ' + error.message, 'error');
+      return false;
+    }
+    
+    toast('User account disabled successfully!', 'success');
+    if (currentPage === 'admin') {
+      renderPage();
+    }
     return true;
   }
 
   // ================================================================
-  //  NAVIGATION & RENDERING (similar to original, but with async data)
+  //  REALTIME NOTIFICATIONS WITH AUTO-REFRESH
+  // ================================================================
+
+  function setupRealtimeNotifications() {
+    if (!isLoggedIn()) return;
+
+    const postsChannel = supabaseClient
+      .channel('posts-channel')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'posts'
+        },
+        (payload) => {
+          const newPost = payload.new;
+          if (currentUser && newPost.author_id === currentUser.id) return;
+          toast(`📝 New blog post: "${newPost.title}"`, 'info');
+          if (currentPage === 'home' || currentPage === 'blog' || currentPage === 'admin') {
+            renderPage();
+          }
+        }
+      )
+      .subscribe();
+
+    const commentsChannel = supabaseClient
+      .channel('comments-channel')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'comments'
+        },
+        (payload) => {
+          const newComment = payload.new;
+          if (currentUser && newComment.author_id === currentUser.id) return;
+          supabaseClient
+            .from('posts')
+            .select('title')
+            .eq('id', newComment.post_id)
+            .single()
+            .then(({ data, error }) => {
+              if (error) {
+                toast(`💬 New comment from ${newComment.author_name}`, 'info');
+              } else {
+                toast(`💬 New comment on "${data.title}" by ${newComment.author_name}`, 'info');
+              }
+            });
+          if (currentPage === 'post' && currentPostId === newComment.post_id) {
+            renderPage();
+          }
+          if (currentPage === 'admin') {
+            renderPage();
+          }
+        }
+      )
+      .subscribe();
+
+    window._realtimeChannels = [postsChannel, commentsChannel];
+  }
+
+  // ================================================================
+  //  NAVIGATION & RENDERING
   // ================================================================
   let currentPage = 'home';
   let currentPostId = null;
   let currentCategory = 'all';
   let editingPostId = null;
-  let allPosts = [];
 
   async function navigate(page, data) {
     currentPage = page;
@@ -524,7 +620,6 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
   }
 
   function renderNav() {
-    // same as before
     const links = document.querySelectorAll('[data-nav]');
     links.forEach(el => {
       const nav = el.getAttribute('data-nav');
@@ -549,7 +644,8 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
       registerBtn.classList.add('hidden');
       logoutBtn.classList.remove('hidden');
       greeting.classList.remove('hidden');
-      greeting.textContent = '👋 ' + (user.email.split('@')[0]);
+      const displayName = user.username || user.email.split('@')[0];
+      greeting.textContent = '👋 ' + displayName;
     } else {
       loginBtn.classList.remove('hidden');
       registerBtn.classList.remove('hidden');
@@ -573,7 +669,7 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
     bindEvents();
   }
 
-  // ---------- RENDER FUNCTIONS (async) ----------
+  // ---------- RENDER FUNCTIONS ----------
   async function renderHome() {
     const posts = await getPosts();
     const featured = posts.slice(0, 3);
@@ -638,7 +734,6 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
       return `<div class="container"><div class="empty-state"><i class="fas fa-search"></i><h4>Post not found</h4></div></div>`;
     }
     const isAdminUser = isAdmin();
-    // Comments are nested; we need to map them (comments is an array)
     const comments = post.comments || [];
     return `
       <div class="container" style="padding-top:30px;">
@@ -844,10 +939,9 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
   }
 
   // ================================================================
-  //  EVENT BINDING (with async handlers)
+  //  EVENT BINDING
   // ================================================================
   function bindEvents() {
-    // Navigation
     document.querySelectorAll('[data-nav]').forEach(el => {
       el.onclick = (e) => {
         e.preventDefault();
@@ -858,7 +952,6 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
       };
     });
 
-    // Category filter
     document.querySelectorAll('[data-cat]').forEach(el => {
       el.onclick = () => { const cat = el.getAttribute('data-cat'); navigate('blog', cat); };
     });
@@ -866,12 +959,10 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
       el.onclick = () => { const cat = el.getAttribute('data-nav-cat'); navigate('blog', cat === 'all' ? 'all' : cat); };
     });
 
-    // View post
     document.querySelectorAll('[data-view-post]').forEach(el => {
       el.onclick = () => { const id = el.getAttribute('data-view-post'); navigate('post', id); };
     });
 
-    // Edit post (admin)
     document.querySelectorAll('[data-edit-post]').forEach(el => {
       el.onclick = () => {
         if (!isAdmin()) { toast('Admin access required.', 'error'); return; }
@@ -881,32 +972,24 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
       };
     });
 
-    // Delete post
     document.querySelectorAll('[data-delete-post]').forEach(el => {
       el.onclick = async () => {
         if (!isAdmin()) { toast('Admin access required.', 'error'); return; }
         const id = el.getAttribute('data-delete-post');
         if (confirm('Delete this post permanently?')) {
           await deletePost(id);
-          if (currentPage === 'post' && currentPostId === id) navigate('blog');
-          else renderPage();
         }
       };
     });
 
-    // Delete user (admin)
     document.querySelectorAll('[data-delete-user]').forEach(el => {
       el.onclick = async () => {
         if (!isAdmin()) { toast('Admin access required.', 'error'); return; }
         const id = el.getAttribute('data-delete-user');
-        if (confirm('Remove this user?')) {
-          await deleteUser(id);
-          renderPage();
-        }
+        await deleteUser(id);
       };
     });
 
-    // Submit comment
     const commentBtn = document.getElementById('submitCommentBtn');
     if (commentBtn) {
       commentBtn.onclick = async () => {
@@ -916,12 +999,10 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
         const success = await addComment(postId, input.value.trim());
         if (success) {
           input.value = '';
-          navigate('post', postId);
         }
       };
     }
 
-    // Submit community post
     const communityBtn = document.getElementById('submitCommunityBtn');
     if (communityBtn) {
       communityBtn.onclick = async () => {
@@ -931,12 +1012,10 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
         const success = await addCommunityPost(input.value.trim(), tag ? tag.value : 'reflection');
         if (success) {
           input.value = '';
-          navigate('community');
         }
       };
     }
 
-    // Admin: New Post
     const newBtn = document.getElementById('adminNewPostBtn');
     if (newBtn) {
       newBtn.onclick = () => {
@@ -955,7 +1034,6 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
       };
     }
 
-    // Admin: Cancel Edit
     const cancelEditBtn = document.getElementById('adminCancelEditBtn');
     if (cancelEditBtn) {
       cancelEditBtn.onclick = () => {
@@ -966,7 +1044,6 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
       };
     }
 
-    // Admin: Post Form Submit
     const submitBtn = document.getElementById('postFormSubmitBtn');
     if (submitBtn) {
       submitBtn.onclick = async () => {
@@ -987,12 +1064,10 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
           if (form) form.style.display = 'none';
           const cancelEditBtn = document.getElementById('adminCancelEditBtn');
           if (cancelEditBtn) cancelEditBtn.style.display = 'none';
-          navigate('admin');
         }
       };
     }
 
-    // Admin: Post Form Cancel
     const cancelBtn = document.getElementById('postFormCancelBtn');
     if (cancelBtn) {
       cancelBtn.onclick = () => {
@@ -1004,7 +1079,6 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
       };
     }
 
-    // Auth Form
     const authForm = document.getElementById('authForm');
     if (authForm) {
       authForm.onsubmit = async (e) => {
@@ -1023,12 +1097,10 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
       };
     }
 
-    // Header auth buttons
     document.getElementById('loginBtn').onclick = () => { if (!isLoggedIn()) navigate('login'); };
     document.getElementById('registerBtn').onclick = () => { if (!isLoggedIn()) navigate('register'); };
     document.getElementById('logoutBtn').onclick = logoutUser;
 
-    // Enter key for comment and community inputs
     const commentInput = document.getElementById('commentInput');
     if (commentInput) {
       commentInput.addEventListener('keydown', (e) => {
@@ -1056,6 +1128,7 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
   // ================================================================
   async function init() {
     await initAuth();
+    setupRealtimeNotifications();
     await navigate('home');
   }
 
