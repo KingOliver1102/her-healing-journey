@@ -676,7 +676,7 @@
       logoutBtn.classList.remove('hidden');
       greeting.classList.remove('hidden');
       // Use username if available, otherwise fallback to email
-      const displayName = user.username || user.email.split('@')[0];
+      const displayName = user.username[0];
       greeting.textContent = '👋 ' + displayName;
     } else {
       loginBtn.classList.remove('hidden');
