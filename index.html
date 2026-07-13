@@ -420,11 +420,17 @@
         excerpt: excerpt || truncate(content, 130),
         content,
         author_id: currentUser.id,
-        author_name: currentUser.username || currentUser.email.split('@')[0] // Use username if available
+        author_name: currentUser.username || currentUser.email.split('@')[0]
       }])
       .select();
     if (error) { toast(error.message, 'error'); return false; }
     toast('Post published!', 'success');
+    // Refresh the current page
+    if (currentPage === 'admin') {
+      renderPage();
+    } else {
+      navigate('home');
+    }
     return true;
   }
 
@@ -436,6 +442,10 @@
       .eq('id', id);
     if (error) { toast(error.message, 'error'); return false; }
     toast('Post updated!', 'success');
+    // Refresh the admin page
+    if (currentPage === 'admin') {
+      renderPage();
+    }
     return true;
   }
 
@@ -447,6 +457,11 @@
       .eq('id', id);
     if (error) { toast(error.message, 'error'); return false; }
     toast('Post deleted.', 'info');
+    if (currentPage === 'post' && currentPostId === id) {
+      navigate('blog');
+    } else if (currentPage === 'admin') {
+      renderPage();
+    }
     return true;
   }
 
@@ -463,6 +478,10 @@
       }]);
     if (error) { toast(error.message, 'error'); return false; }
     toast('Comment added!', 'success');
+    // Refresh the post detail page
+    if (currentPage === 'post' && currentPostId === postId) {
+      renderPage();
+    }
     return true;
   }
 
@@ -488,6 +507,10 @@
       }]);
     if (error) { toast(error.message, 'error'); return false; }
     toast('Thank you for sharing!', 'success');
+    // Refresh the community page
+    if (currentPage === 'community') {
+      renderPage();
+    }
     return true;
   }
 
@@ -502,17 +525,29 @@
 
   async function deleteUser(userId) {
     if (!isAdmin()) { toast('Admin access required.', 'error'); return false; }
+    if (!confirm('Disable this user account? They will no longer be able to log in.')) return false;
+    
+    // Instead of deleting, disable the user by setting role to 'disabled'
     const { error } = await supabaseClient
       .from('profiles')
-      .delete()
+      .update({ role: 'disabled' })
       .eq('id', userId);
-    if (error) { toast(error.message, 'error'); return false; }
-    toast('User removed.', 'info');
+    
+    if (error) {
+      toast('Error disabling user: ' + error.message, 'error');
+      return false;
+    }
+    
+    toast('User account disabled successfully!', 'success');
+    // Refresh the admin page
+    if (currentPage === 'admin') {
+      renderPage();
+    }
     return true;
   }
 
   // ================================================================
-  //  REALTIME NOTIFICATIONS (NEW)
+  //  REALTIME NOTIFICATIONS WITH AUTO-REFRESH
   // ================================================================
 
   function setupRealtimeNotifications() {
@@ -533,7 +568,17 @@
           const newPost = payload.new;
           // Don't notify if the current user created the post
           if (currentUser && newPost.author_id === currentUser.id) return;
+          
           toast(`📝 New blog post: "${newPost.title}"`, 'info');
+          
+          // Auto-refresh if on home or blog page
+          if (currentPage === 'home' || currentPage === 'blog') {
+            renderPage();
+          }
+          // If on admin, refresh to update the list
+          if (currentPage === 'admin') {
+            renderPage();
+          }
         }
       )
       .subscribe();
@@ -552,6 +597,7 @@
           const newComment = payload.new;
           // Don't notify if the current user posted the comment
           if (currentUser && newComment.author_id === currentUser.id) return;
+          
           // Fetch the related post title to show in notification
           supabaseClient
             .from('posts')
@@ -565,6 +611,15 @@
                 toast(`💬 New comment on "${data.title}" by ${newComment.author_name}`, 'info');
               }
             });
+          
+          // Auto-refresh if viewing the post that got a comment
+          if (currentPage === 'post' && currentPostId === newComment.post_id) {
+            renderPage();
+          }
+          // If on admin, refresh to update the list
+          if (currentPage === 'admin') {
+            renderPage();
+          }
         }
       )
       .subscribe();
@@ -648,7 +703,6 @@
 
   // ---------- RENDER FUNCTIONS ----------
   // (All render functions remain unchanged – they're the same as before)
-  // For brevity, I'm keeping them as they were, but they're all included in the final code.
 
   async function renderHome() {
     const posts = await getPosts();
@@ -963,8 +1017,6 @@
         const id = el.getAttribute('data-delete-post');
         if (confirm('Delete this post permanently?')) {
           await deletePost(id);
-          if (currentPage === 'post' && currentPostId === id) navigate('blog');
-          else renderPage();
         }
       };
     });
@@ -974,10 +1026,7 @@
       el.onclick = async () => {
         if (!isAdmin()) { toast('Admin access required.', 'error'); return; }
         const id = el.getAttribute('data-delete-user');
-        if (confirm('Remove this user?')) {
-          await deleteUser(id);
-          renderPage();
-        }
+        await deleteUser(id);
       };
     });
 
@@ -991,7 +1040,6 @@
         const success = await addComment(postId, input.value.trim());
         if (success) {
           input.value = '';
-          navigate('post', postId);
         }
       };
     }
@@ -1006,7 +1054,6 @@
         const success = await addCommunityPost(input.value.trim(), tag ? tag.value : 'reflection');
         if (success) {
           input.value = '';
-          navigate('community');
         }
       };
     }
@@ -1062,7 +1109,6 @@
           if (form) form.style.display = 'none';
           const cancelEditBtn = document.getElementById('adminCancelEditBtn');
           if (cancelEditBtn) cancelEditBtn.style.display = 'none';
-          navigate('admin');
         }
       };
     }
@@ -1131,7 +1177,7 @@
   // ================================================================
   async function init() {
     await initAuth();
-    setupRealtimeNotifications(); // NEW: Start listening for new posts/comments
+    setupRealtimeNotifications(); // Start listening for new posts/comments
     await navigate('home');
   }
 
