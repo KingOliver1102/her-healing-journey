@@ -312,13 +312,16 @@
     currentSession = session;
     if (session) {
       currentUser = session.user;
-      // Fetch profile role
+      // Fetch profile including username
       const { data: profile } = await supabaseClient
         .from('profiles')
-        .select('role')
+        .select('role, username')
         .eq('id', session.user.id)
         .single();
-      if (profile) currentUser.role = profile.role;
+      if (profile) {
+        currentUser.role = profile.role;
+        currentUser.username = profile.username; // Store username
+      }
     }
     renderNav();
   }
@@ -331,13 +334,16 @@
     }
     currentUser = data.user;
     currentSession = data.session;
-    // Fetch role
+    // Fetch profile including username
     const { data: profile } = await supabaseClient
       .from('profiles')
-      .select('role')
+      .select('role, username')
       .eq('id', data.user.id)
       .single();
-    if (profile) currentUser.role = profile.role;
+    if (profile) {
+      currentUser.role = profile.role;
+      currentUser.username = profile.username;
+    }
     toast('Welcome back!', 'success');
     renderNav();
     navigate('home');
@@ -414,7 +420,7 @@
         excerpt: excerpt || truncate(content, 130),
         content,
         author_id: currentUser.id,
-        author_name: currentUser.email.split('@')[0] // fallback
+        author_name: currentUser.username || currentUser.email.split('@')[0] // Use username if available
       }])
       .select();
     if (error) { toast(error.message, 'error'); return false; }
@@ -452,7 +458,7 @@
       .insert([{
         post_id: postId,
         author_id: currentUser.id,
-        author_name: currentUser.email.split('@')[0],
+        author_name: currentUser.username || currentUser.email.split('@')[0],
         text
       }]);
     if (error) { toast(error.message, 'error'); return false; }
@@ -476,7 +482,7 @@
       .from('community_posts')
       .insert([{
         author_id: currentUser.id,
-        author_name: currentUser.email.split('@')[0],
+        author_name: currentUser.username || currentUser.email.split('@')[0],
         content,
         tag: tag || 'reflection'
       }]);
@@ -614,7 +620,9 @@
       registerBtn.classList.add('hidden');
       logoutBtn.classList.remove('hidden');
       greeting.classList.remove('hidden');
-      greeting.textContent = '👋 ' + (user.email.split('@')[0]);
+      // Use username if available, otherwise fallback to email
+      const displayName = user.username || user.email.split('@')[0];
+      greeting.textContent = '👋 ' + displayName;
     } else {
       loginBtn.classList.remove('hidden');
       registerBtn.classList.remove('hidden');
