@@ -240,10 +240,10 @@
 
 <script>
   // ================================================================
-  //  SUPABASE CONFIGURATION  (REPLACE WITH YOUR OWN)
+  //  SUPABASE CONFIGURATION
   // ================================================================
-const SUPABASE_URL = 'https://ftwblniakzjtfpsmyklx.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ0d2Jsbmlha3pqdGZwc215a2x4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM4MTcwNTIsImV4cCI6MjA5OTM5MzA1Mn0.muScYbd321599Ei4YidwFvZ4z0frBcH9G_ePn814RFU';
+  const SUPABASE_URL = 'https://ftwblniakzjtfpsmyklx.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ0d2Jsbmlha3pqdGZwc215a2x4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM4MTcwNTIsImV4cCI6MjA5OTM5MzA1Mn0.muScYbd321599Ei4YidwFvZ4z0frBcH9G_ePn814RFU';
 
   const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -362,6 +362,13 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
   }
 
   async function logoutUser() {
+    // Unsubscribe from realtime channels
+    if (window._realtimeChannels) {
+      window._realtimeChannels.forEach(channel => {
+        supabaseClient.removeChannel(channel);
+      });
+      window._realtimeChannels = [];
+    }
     await supabaseClient.auth.signOut();
     currentUser = null;
     currentSession = null;
@@ -489,9 +496,6 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 
   async function deleteUser(userId) {
     if (!isAdmin()) { toast('Admin access required.', 'error'); return false; }
-    // Delete from auth (requires admin privileges) – Supabase allows via REST if using service role key, but we'll keep it simple: delete from profiles only.
-    // For a full solution, you'd call a Supabase Edge Function with service role.
-    // We'll just remove from profiles (cascade delete is on).
     const { error } = await supabaseClient
       .from('profiles')
       .delete()
@@ -502,7 +506,69 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
   }
 
   // ================================================================
-  //  NAVIGATION & RENDERING (similar to original, but with async data)
+  //  REALTIME NOTIFICATIONS (NEW)
+  // ================================================================
+
+  function setupRealtimeNotifications() {
+    // Only listen if user is logged in
+    if (!isLoggedIn()) return;
+
+    // Subscribe to new posts
+    const postsChannel = supabaseClient
+      .channel('posts-channel')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'posts'
+        },
+        (payload) => {
+          const newPost = payload.new;
+          // Don't notify if the current user created the post
+          if (currentUser && newPost.author_id === currentUser.id) return;
+          toast(`📝 New blog post: "${newPost.title}"`, 'info');
+        }
+      )
+      .subscribe();
+
+    // Subscribe to new comments
+    const commentsChannel = supabaseClient
+      .channel('comments-channel')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'comments'
+        },
+        (payload) => {
+          const newComment = payload.new;
+          // Don't notify if the current user posted the comment
+          if (currentUser && newComment.author_id === currentUser.id) return;
+          // Fetch the related post title to show in notification
+          supabaseClient
+            .from('posts')
+            .select('title')
+            .eq('id', newComment.post_id)
+            .single()
+            .then(({ data, error }) => {
+              if (error) {
+                toast(`💬 New comment from ${newComment.author_name}`, 'info');
+              } else {
+                toast(`💬 New comment on "${data.title}" by ${newComment.author_name}`, 'info');
+              }
+            });
+        }
+      )
+      .subscribe();
+
+    // Store channels so we can unsubscribe later
+    window._realtimeChannels = [postsChannel, commentsChannel];
+  }
+
+  // ================================================================
+  //  NAVIGATION & RENDERING
   // ================================================================
   let currentPage = 'home';
   let currentPostId = null;
@@ -524,7 +590,6 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
   }
 
   function renderNav() {
-    // same as before
     const links = document.querySelectorAll('[data-nav]');
     links.forEach(el => {
       const nav = el.getAttribute('data-nav');
@@ -573,7 +638,10 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
     bindEvents();
   }
 
-  // ---------- RENDER FUNCTIONS (async) ----------
+  // ---------- RENDER FUNCTIONS ----------
+  // (All render functions remain unchanged – they're the same as before)
+  // For brevity, I'm keeping them as they were, but they're all included in the final code.
+
   async function renderHome() {
     const posts = await getPosts();
     const featured = posts.slice(0, 3);
@@ -638,7 +706,6 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
       return `<div class="container"><div class="empty-state"><i class="fas fa-search"></i><h4>Post not found</h4></div></div>`;
     }
     const isAdminUser = isAdmin();
-    // Comments are nested; we need to map them (comments is an array)
     const comments = post.comments || [];
     return `
       <div class="container" style="padding-top:30px;">
@@ -844,7 +911,7 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
   }
 
   // ================================================================
-  //  EVENT BINDING (with async handlers)
+  //  EVENT BINDING
   // ================================================================
   function bindEvents() {
     // Navigation
@@ -1056,6 +1123,7 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
   // ================================================================
   async function init() {
     await initAuth();
+    setupRealtimeNotifications(); // NEW: Start listening for new posts/comments
     await navigate('home');
   }
 
